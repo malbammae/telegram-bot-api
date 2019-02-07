@@ -25,16 +25,30 @@ type BotAPI struct {
 	Debug  bool   `json:"debug"`
 	Buffer int    `json:"buffer"`
 
-	Self   User         `json:"-"`
-	Client *http.Client `json:"-"`
+	Self            User         `json:"-"`
+	Client          *http.Client `json:"-"`
 	shutdownChannel chan interface{}
 }
 
 // NewBotAPI creates a new BotAPI instance.
 //
 // It requires a token, provided by @BotFather on Telegram.
-func NewBotAPI(token string) (*BotAPI, error) {
-	return NewBotAPIWithClient(token, &http.Client{})
+func NewBotAPI(token, proxyurl string) (*BotAPI, error) {
+
+	if proxyurl == "" {
+		return NewBotAPIWithClient(token, &http.Client{})
+	}
+
+	fixedURL, err := url.Parse(proxyurl)
+	if err != nil {
+		panic(err)
+	}
+	tr := &http.Transport{
+		Proxy: http.ProxyURL(fixedURL),
+	}
+
+	return NewBotAPIWithClient(token, &http.Client{Transport: tr})
+
 }
 
 // NewBotAPIWithClient creates a new BotAPI instance
@@ -43,9 +57,9 @@ func NewBotAPI(token string) (*BotAPI, error) {
 // It requires a token, provided by @BotFather on Telegram.
 func NewBotAPIWithClient(token string, client *http.Client) (*BotAPI, error) {
 	bot := &BotAPI{
-		Token:  token,
-		Client: client,
-		Buffer: 100,
+		Token:           token,
+		Client:          client,
+		Buffer:          100,
 		shutdownChannel: make(chan interface{}),
 	}
 
@@ -490,7 +504,7 @@ func (bot *BotAPI) GetUpdatesChan(config UpdateConfig) (UpdatesChannel, error) {
 				return
 			default:
 			}
-			
+
 			updates, err := bot.GetUpdates(config)
 			if err != nil {
 				log.Println(err)
